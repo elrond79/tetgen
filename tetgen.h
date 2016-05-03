@@ -610,6 +610,7 @@ public:
   int voroout;                                                     // '-v', 0.
   int meditview;                                                   // '-g', 0.
   int vtkview;                                                     // '-k', 0.
+  int objview;                                                     // '-j', 0.
   int nobound;                                                     // '-B', 0.
   int nonodewritten;                                               // '-N', 0.
   int noelewritten;                                                // '-E', 0.
@@ -715,6 +716,7 @@ public:
     voroout = 0;
     meditview = 0;
     vtkview = 0;
+    objview = 0;
     nobound = 0;
     nonodewritten = 0;
     noelewritten = 0;
@@ -2064,6 +2066,7 @@ public:
   void outsmesh(char*);
   void outmesh2medit(char*);
   void outmesh2vtk(char*);
+  void outmesh2obj(char*);
 
 
 

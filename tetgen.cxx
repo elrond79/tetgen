@@ -2921,6 +2921,7 @@ void tetgenbehavior::syntax()
   printf("    -v  Outputs Voronoi diagram to files.\n");
   printf("    -g  Outputs mesh to .mesh file for viewing by Medit.\n");
   printf("    -k  Outputs mesh to .vtk file for viewing by Paraview.\n");
+  printf("    -j  Outputs mesh to .obj file for use in 3d authoring tools.\n");
   printf("    -J  No jettison of unused vertices from output .node file.\n");
   printf("    -B  Suppresses output of boundary information.\n");
   printf("    -N  Suppresses output of .node file.\n");
@@ -3275,7 +3276,9 @@ bool tetgenbehavior::parse_commandline(int argc, char **argv)
       } else if (argv[i][j] == 'g') {
         meditview = 1;
       } else if (argv[i][j] == 'k') {
-        vtkview = 1;  
+        vtkview = 1;
+      } else if (argv[i][j] == 'j') {
+        objview = 1;
       } else if (argv[i][j] == 'J') {
         nojettison = 1;
       } else if (argv[i][j] == 'B') {
@@ -30803,6 +30806,95 @@ void tetgenmesh::outmesh2vtk(char* ofilename)
   fclose(outfile);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// outmesh2obj()    Write mesh to an .obj file, which can be read and        //
+//                    rendered by Maya, 3ds max, and many other 3d tools.    //
+//                                                                           //
+// You can specify a filename (without suffix) in 'mfilename'.  If you don't //
+// supply a filename (let mfilename be NULL), the default name stored in     //
+// 'tetgenbehavior' will be used. The output file will have the suffix .obj. //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
+void tetgenmesh::outmesh2obj(char* mfilename)
+{
+  FILE *outfile;
+  char mefilename[FILENAMESIZE];
+  tetrahedron* tetptr;
+  triface tface, tsymface;
+  face segloop, checkmark;
+  point ptloop, p1, p2, p3, p4;
+  long ntets, faces;
+  int pointnumber;
+  int faceid, marker;
+  int i;
+
+  if (mfilename != (char *) NULL && mfilename[0] != '\0') {
+    strcpy(mefilename, mfilename);
+  } else if (b->outfilename[0] != '\0') {
+    strcpy(mefilename, b->outfilename);
+  } else {
+    strcpy(mefilename, "unnamed");
+  }
+  strcat(mefilename, ".obj");
+
+  if (!b->quiet) {
+    printf("Writing %s.\n", mefilename);
+  }
+  outfile = fopen(mefilename, "w");
+  if (outfile == (FILE *) NULL) {
+    printf("File I/O Error:  Cannot create file %s.\n", mefilename);
+    return;
+  }
+
+  // Compute the number of faces.
+  ntets = tetrahedrons->items - hullsize;
+  faces = (ntets * 4l + hullsize) / 2l;
+
+  fprintf(outfile, "# File exported by tetgen\n");
+  fprintf(outfile, "# %ld Vertices\n", points->items);
+  fprintf(outfile, "# %ld Triangles\n", faces);
+  fprintf(outfile, "\n");
+
+  fprintf(outfile, "# %ld Vertices:\n\n", points->items);
+
+  points->traversalinit();
+  ptloop = pointtraverse();
+  pointnumber = 1;                        // Medit need start number form 1.
+  while (ptloop != (point) NULL) {
+    // Point coordinates.
+    fprintf(outfile, "v %.17g  %.17g  %.17g\n", ptloop[0], ptloop[1], ptloop[2]);
+    setpointmark(ptloop, pointnumber);
+    ptloop = pointtraverse();
+    pointnumber++;
+  }
+
+  fprintf(outfile, "# %ld Triangles:\n\n", faces);
+
+  tetrahedrons->traversalinit();
+  tface.tet = tetrahedrontraverse();
+  while (tface.tet != (tetrahedron *) NULL) {
+    for (tface.ver = 0; tface.ver < 4; tface.ver ++) {
+      fsym(tface, tsymface);
+      if (ishulltet(tsymface) || 
+          (elemindex(tface.tet) < elemindex(tsymface.tet))) {
+        p1 = org (tface);
+        p2 = dest(tface);
+        p3 = apex(tface);
+        fprintf(outfile, "f %5d  %5d  %5d\n",
+                pointmark(p1), pointmark(p2), pointmark(p3));
+      }
+    }
+    tface.tet = tetrahedrontraverse();
+  }
+
+  fprintf(outfile, "\n");
+
+  fclose(outfile);
+}
+
+
 ////                                                                       ////
 ////                                                                       ////
 //// output_cxx ///////////////////////////////////////////////////////////////
@@ -31139,7 +31231,11 @@ void tetrahedralize(tetgenbehavior *b, tetgenio *in, tetgenio *out,
     m.outmesh2vtk(b->outfilename); 
   }
 
-  if (b->neighout) {
+  if (!out && b->objview) {
+    m.outmesh2obj(b->outfilename);
+  }
+
+    if (b->neighout) {
     m.outneighbors(out);
   }
 
